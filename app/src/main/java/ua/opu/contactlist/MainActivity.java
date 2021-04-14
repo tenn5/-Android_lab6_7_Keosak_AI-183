@@ -21,16 +21,22 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import butterknife.OnClick;
 
 public class MainActivity extends AppCompatActivity implements ContactsAdapter.DeleteItemListener{
 
-    private RecyclerView mRecyclerView;
-    private FloatingActionButton mAddContactButton;
+    @BindView(R.id.list)
+    RecyclerView mContactRV;
 
-    private static final int ADD_CONTACT_REQUEST_CODE = 5556;
+    private AppDatabase db;
+    private Executor executor = Executors.newSingleThreadExecutor();
 
-    private List<Contact> list = new ArrayList<>();
-
+    private List<Contact> contacts;
     private ContactsAdapter adapter;
 
     @Override
@@ -38,38 +44,47 @@ public class MainActivity extends AppCompatActivity implements ContactsAdapter.D
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         setWindow();
+        ButterKnife.bind(this);
 
-        mRecyclerView = findViewById(R.id.list);
-        mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new ContactsAdapter(getApplicationContext(), list, this);
-        mRecyclerView.setAdapter(adapter);
+        db = AppDatabase.getInstance(this);
 
-        mAddContactButton = findViewById(R.id.fab);
-        mAddContactButton.setOnClickListener(v -> {
-            Intent i = new Intent(this, AddContactActivity.class);
-            startActivityForResult(i, ADD_CONTACT_REQUEST_CODE);
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        updateData();
+        verifyStoragePermissions();
+    }
+
+    @Override
+    public void onDeleteItem(int id) {
+        executor.execute(() -> {
+
+            db.contactDAO().deleteContactById(id);
+            updateData();
         });
     }
 
-    @Override
-    public void onDeleteItem(int position) {
-        list.remove(position);
-        adapter.notifyDataSetChanged();
+    private void updateData() {
+        executor.execute(() -> {
+            // С помощью метода getAll() получаем все заметки из БД
+            contacts = new ArrayList<>(db.contactDAO().getAll());
+            runOnUiThread(() -> {
+
+                mContactRV.setLayoutManager(new LinearLayoutManager(this));
+                adapter = new ContactsAdapter(this, contacts);
+                mContactRV.setAdapter(adapter);
+            });
+        });
+
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == ADD_CONTACT_REQUEST_CODE && resultCode == RESULT_OK && data != null){
-            String name = data.getStringExtra(Intent.EXTRA_USER);
-            String email = data.getStringExtra(Intent.EXTRA_EMAIL);
-            String phone = data.getStringExtra(Intent.EXTRA_PHONE_NUMBER);
-            Uri uri = Uri.parse(data.getStringExtra(Intent.EXTRA_ORIGINATING_URI));
-
-            list.add(new Contact(name, email, phone, uri));
-            adapter.notifyDataSetChanged();
-        }
+    @OnClick(R.id.fab)
+    public void fabClick() {
+        Intent i = new Intent(this, AddContactActivity.class);
+        startActivity(i);
     }
 
     private void setWindow() {
@@ -103,10 +118,4 @@ public class MainActivity extends AppCompatActivity implements ContactsAdapter.D
         }
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-
-        verifyStoragePermissions();
-    }
 }

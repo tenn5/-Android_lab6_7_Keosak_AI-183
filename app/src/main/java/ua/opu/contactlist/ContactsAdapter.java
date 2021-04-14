@@ -1,6 +1,8 @@
 package ua.opu.contactlist;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
+import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,6 +15,9 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
 
+import lombok.AllArgsConstructor;
+
+@AllArgsConstructor
 public class ContactsAdapter extends RecyclerView.Adapter<ContactsAdapter.ContactHolder> {
 
     public interface DeleteItemListener {
@@ -21,66 +26,23 @@ public class ContactsAdapter extends RecyclerView.Adapter<ContactsAdapter.Contac
 
     private final LayoutInflater inflater;
     private final List<Contact> list;
-    private DeleteItemListener listener;
+    private final DeleteItemListener listener;
 
-    private static final int EMPTY_LIST_TYPE = 0;
-    private static final int NON_EMPTY_LIST_TYPE = 1;
-
-    public ContactsAdapter(Context context, List<Contact> users, DeleteItemListener listener) {
+    public ContactsAdapter(Context context, List<Contact> users) {
         this.inflater = LayoutInflater.from(context);
         this.list = users;
-        this.listener = listener;
+        this.listener = (DeleteItemListener) context;
     }
 
-    @NonNull
-    @Override
-    public ContactHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view;
-
-        if (viewType == EMPTY_LIST_TYPE){
-            view = inflater.inflate(R.layout.list_no_items, parent, false);
-            view.setTag(EMPTY_LIST_TYPE);
-        } else {
-            view = inflater.inflate(R.layout.list_contact, parent, false);
-            view.setTag(NON_EMPTY_LIST_TYPE);
-        }
-        return new ContactHolder(view, listener);
-    }
-
-    @Override
-    public void onBindViewHolder(@NonNull ContactHolder holder, int position) {
-        if (getItemViewType(position) == EMPTY_LIST_TYPE){
-            return;
-        }
-
-        Contact contact = list.get(position);
-
-        holder.image.setImageURI(contact.getUri());
-        holder.name.setText(contact.getName());
-        holder.email.setText(contact.getEmail());
-        holder.phone.setText(contact.getPhone());
-    }
-
-    @Override
-    public int getItemCount() {
-        return Math.max(list.size(), 1);
-    }
-
-    @Override
-    public int getItemViewType(int position){
-        return list.isEmpty() ? EMPTY_LIST_TYPE : NON_EMPTY_LIST_TYPE;
-    }
-
-    static class ContactHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
+    class ContactHolder extends RecyclerView.ViewHolder {
         ImageView image;
         TextView name;
         TextView email;
         TextView phone;
 
         ImageButton deleteButton;
-        DeleteItemListener listener;
 
-        public ContactHolder (@NonNull View itemView, DeleteItemListener listener) {
+        public ContactHolder (@NonNull View itemView) {
             super(itemView);
 
             image = itemView.findViewById(R.id.contact_image);
@@ -89,16 +51,44 @@ public class ContactsAdapter extends RecyclerView.Adapter<ContactsAdapter.Contac
             phone = itemView.findViewById(R.id.phone);
 
             deleteButton = itemView.findViewById(R.id.clearButton);
-            this.listener = listener;
+        }
+    }
 
-            if ((int) itemView.getTag() == NON_EMPTY_LIST_TYPE) {
-                deleteButton.setOnClickListener(this);
-            }
+    @NonNull
+    @Override
+    public ContactHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view;
+
+        if (list.size() == 0) {
+            view = LayoutInflater.from(parent.getContext()).inflate(R.layout.list_no_items, parent, false);
+        } else {
+            view = LayoutInflater.from(parent.getContext()).inflate(R.layout.list_contact, parent, false);
         }
 
-        @Override
-        public void onClick(View v) {
-            listener.onDeleteItem(getAdapterPosition());
+        return new ContactHolder(view);
+    }
+
+    @SuppressLint("SetTextI18n")
+    @Override
+    public void onBindViewHolder(@NonNull ContactHolder holder, int position) {
+        if (list.size() == 0){
+            return;
         }
+
+        Contact contact = list.get(position);
+
+        holder.image.setImageURI(Uri.parse(contact.getUri()));
+        holder.name.setText(contact.getName());
+        holder.email.setText(contact.getEmail());
+        holder.phone.setText(contact.getPhone());
+
+        holder.deleteButton.setOnClickListener(view -> {
+            listener.onDeleteItem(contact.getId());
+        });
+    }
+
+    @Override
+    public int getItemCount() {
+        return Math.max(list.size(), 1);
     }
 }

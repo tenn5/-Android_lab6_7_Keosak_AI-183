@@ -21,12 +21,31 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Date;
+import java.util.concurrent.Executors;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import butterknife.OnClick;
 
 public class AddContactActivity extends AppCompatActivity {
 
-    private ImageView mContactImage;
-
     private Uri mContactImageUri;
+
+    @BindView(R.id.profile_image)
+    ImageView mContactImage;
+
+    @BindView(R.id.name_et)
+    EditText nameEditText;
+
+    @BindView(R.id.email_et)
+    EditText emailEditText;
+
+    @BindView(R.id.phone_et)
+    EditText phoneEditText;
+
+    private AppDatabase db;
+
 
     private static final int IMAGE_CAPTURE_REQUEST_CODE = 7777;
 
@@ -36,32 +55,8 @@ public class AddContactActivity extends AppCompatActivity {
         setContentView(R.layout.activity_add_contact);
         setWindow();
 
-        mContactImage = findViewById(R.id.profile_image);
-
-        EditText nameEditText = findViewById(R.id.name_et);
-        EditText emailEditText = findViewById(R.id.email_et);
-        EditText phoneEditText = findViewById(R.id.phone_et);
-
-        Button addContactButton = findViewById(R.id.button_add);
-        addContactButton.setOnClickListener(v -> {
-            if(mContactImageUri == null){
-                Toast.makeText(this, "Contact image not set!", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            String name = nameEditText.getText().toString();
-            String email = emailEditText.getText().toString();
-            String phone = phoneEditText.getText().toString();
-
-            Intent i = new Intent();
-            i.putExtra(Intent.EXTRA_USER, name);
-            i.putExtra(Intent.EXTRA_EMAIL, email);
-            i.putExtra(Intent.EXTRA_PHONE_NUMBER, phone);
-            i.putExtra(Intent.EXTRA_ORIGINATING_URI, mContactImageUri.toString());
-
-            setResult(RESULT_OK, i);
-            finish();
-        });
+        ButterKnife.bind(this);
+        db = AppDatabase.getInstance(this);
 
         Button takePhotoButton = findViewById(R.id.button_camera);
         takePhotoButton.setOnClickListener(v -> {
@@ -75,6 +70,27 @@ public class AddContactActivity extends AppCompatActivity {
 
         Button cancelButton = findViewById(R.id.button_cancel);
         cancelButton.setOnClickListener(v -> onBackPressed());
+    }
+
+    @OnClick(R.id.button_add)
+    public void createClick() {
+
+        if(mContactImageUri == null){
+            Toast.makeText(this, "Contact image not set!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String name = nameEditText.getText().toString();
+        String email = emailEditText.getText().toString();
+        String phone = phoneEditText.getText().toString();
+        String image = mContactImageUri.toString();
+
+        Contact contact = new Contact(name, email, phone, image);
+
+        Executors.newSingleThreadExecutor().execute(
+                () -> db.contactDAO().insertContact(contact));
+
+        finish();
     }
 
     @Override
